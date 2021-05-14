@@ -2,6 +2,7 @@
 
 import random
 import arcade
+import math
 
 # --- Constants ---
 BB8_scale = 0.3
@@ -10,6 +11,8 @@ bullet_scale = 1
 SW = 800
 SH = 600
 speed = 4
+Bullet_Points = -1
+Trooper_Points = 5
 
 explosion_texture_count = 50
 
@@ -19,6 +22,12 @@ Level_1 = 1
 Level_2 = 2
 Level_3 = 3
 Finished = 4
+
+# speed constants
+Movement_Speed = 5
+Angle_Speed = 5
+Bullet_Speed = 10
+E_Bullet_Speed = 8
 
 
 # -------Explosion---------
@@ -44,24 +53,39 @@ class Player(arcade.Sprite):
         super().__init__("Images/bb8.png", BB8_scale)
         self.laser_sound = arcade.load_sound("sounds/laser.mp3")
         self.explosion_sound = arcade.load_sound("sounds/explosion.mp3")
+        self.speed = 0
+        self.change_angle = 0
 
     def update(self):
-        self.center_x += self.change_x
-        if self.right < 0:
-            self.right = SW
-        elif self.left > SW:
+        self.angle += self.change_angle
+        angle_rad = math.radians(self.angle)
+
+        # trig to figure out distance change based on speed and angle
+        self.center_x += -self.speed * math.sin(angle_rad)
+        self.center_y += self.speed * math.cos(angle_rad)
+        # use if statements to keep bb8 in walls
+        if self.left < 0:
             self.left = 0
+        if self.right > SW:
+            self.right = SW
+        if self.top > SH:
+            self.top = SH
+        if self.bottom < 0:
+            self.bottom = 0
 
 
 # --------Enemy Bullet-----
 class EnemyBullet(arcade.Sprite):
     def __init__(self):
         super().__init__("Images/rbullet.png", bullet_scale)
+        self.angle_list = [0, 90, 180, 270]
+        self.angle = random.choice(self.angle_list)
 
     def update(self):
-        self.center_y -= 10
-        self.angle = -90
-        if self.top < 0:
+        angle_shoot = math.radians(self.angle - 90)
+        self.center_x += -E_Bullet_Speed * math.sin(angle_shoot)
+        self.center_y += E_Bullet_Speed * math.cos(angle_shoot)
+        if self.bottom > SH or self.top < 0 or self.right < 0 or self.left > SW:
             self.kill()
 
 
@@ -71,12 +95,16 @@ class Trooper(arcade.Sprite):
         super().__init__("Images/stormtrooper.png", trooper_scale)
         self.w = int(self.width)
         self.h = int(self.height)
+        self.dx = random.randrange(-1, 2, 2)
+        self.dy = random.randrange(-1, 2, 2)
 
     def update(self):
-        self.center_y -= 2
-        if self.top < 0:
-            self.center_x = random.randrange(self.w, SW - self.w)
-            self.center_y = random.randrange(SH + self.h, SH * 2)
+        self.center_x += self.dx
+        self.center_y += self.dy
+        if self.bottom < 0 or self.top > SH:
+            self.dy *= -1
+        elif self.left < 0 or self.right > SW:
+            self.dx *= -1
 
 
 # -------Bullet-----------
@@ -85,8 +113,10 @@ class Bullet(arcade.Sprite):
         super().__init__("Images/bullet.png", bullet_scale)
 
     def update(self):
-        self.center_y += 10
-        if self.bottom > SH:
+        angle_shoot = math.radians(self.angle - 90)
+        self.center_x += -self.speed * math.sin(angle_shoot)
+        self.center_y += self.speed * math.cos(angle_shoot)
+        if self.bottom > SH or self.top < 0 or self.right < 0 or self.left > SW:
             self.kill()
 
 
@@ -131,14 +161,17 @@ class MyGame(arcade.Window):
         # create the player
         self.BB8 = Player()
         self.BB8.center_x = SW/2
-        self.BB8.bottom = 2
+        self.BB8.center_y = SH/2
         self.player_list.append(self.BB8)
 
         # create the troopers
         for i in range(self.trooper_count):
             trooper = Trooper()
-            trooper.center_x = random.randrange(trooper.w, SW - trooper.w)
-            trooper.center_y = random.randrange(SH / 2, SH * 2)
+            if i % 2 == 0:
+                trooper.center_x = random.randrange(trooper.w, int(SW / 3))
+            else:
+                trooper.center_x = random.randrange(int(SW * 2 / 3), SW - trooper.w)
+            trooper.center_y = random.randrange(trooper.h, SH - trooper.h)
             self.trooper_list.append(trooper)
 
     def on_draw(self):
@@ -171,17 +204,22 @@ class MyGame(arcade.Window):
 
     def on_key_press(self, key, modifiers: int):
         if key == arcade.key.LEFT and self.game_running:
-            self.BB8.change_x -= speed
+            self.BB8.change_angle = Angle_Speed
         elif key == arcade.key.RIGHT and self.game_running:
-            self.BB8.change_x += speed
+            self.BB8.change_angle = -Angle_Speed
+        elif key == arcade.key.UP and self.game_running:
+            self.BB8.speed = Movement_Speed
+        elif key == arcade.key.DOWN and self.game_running:
+            self.BB8.speed = -Movement_Speed
         elif key == arcade.key.SPACE and self.game_running:
             self.bullet = Bullet()
             self.bullet.center_x = self.BB8.center_x
-            self.bullet.bottom = self.BB8.top
-            self.bullet.angle = 90
+            self.bullet.center_y = self.BB8.center_y
+            self.bullet.angle = self.BB8.angle + 90
+            self.bullet.speed = Bullet_Speed
             self.bullet_list.append(self.bullet)
             arcade.play_sound(self.BB8.laser_sound)
-            self.score -= 1
+            self.score += Bullet_Points
 
         # level selector
         elif key == arcade.key.I and not self.game_running:
@@ -201,7 +239,9 @@ class MyGame(arcade.Window):
 
     def on_key_release(self, key, modifiers: int):
         if (key == arcade.key.LEFT or key == arcade.key.RIGHT) and self.game_running:
-            self.BB8.change_x = 0
+            self.BB8.change_angle = 0
+        if (key == arcade.key.UP or key == arcade.key.DOWN) and self.game_running:
+            self.BB8.speed = 0
 
     def on_update(self, dt):
         if self.current_state > 0 and self.current_state < 4:
@@ -232,7 +272,7 @@ class MyGame(arcade.Window):
                 if random.randrange(800) == 0:
                     ebullet = EnemyBullet()
                     ebullet.center_x = trooper.center_x
-                    ebullet.top = trooper.bottom
+                    ebullet.center_y = trooper.center_y
                     self.ebullets.append(ebullet)
 
             for bullet in self.bullet_list:
