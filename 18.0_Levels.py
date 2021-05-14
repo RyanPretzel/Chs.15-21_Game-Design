@@ -289,7 +289,7 @@ class MyGame(arcade.Window):
 
                 for trooper in hit_list:
                     trooper.kill()
-                    self.score += 2
+                    self.score += Trooper_Points
 
             bb8_hit = arcade.check_for_collision_with_list(self.BB8, self.ebullets)
             if len(bb8_hit) > 0:
