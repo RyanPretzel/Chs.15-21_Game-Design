@@ -268,6 +268,7 @@ class MyGame(arcade.Window):
                 self.BB8.kill()
                 self.current_state = 4
 
+            # randomly make the troopers shoot
             for trooper in self.trooper_list:
                 if random.randrange(800) == 0:
                     ebullet = EnemyBullet()
